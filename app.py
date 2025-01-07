@@ -75,7 +75,7 @@ if uploaded_file is not None:
 
     if stock_id:
         # Find the stock ID in the submission file
-        stock_data = submission[submission['id'] == int(stock_id)]
+        stock_data = submission[submission['id'] == (stock_id)]
 
         if not stock_data.empty:
             open_price = stock_data['Open'].values[0]
