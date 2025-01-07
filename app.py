@@ -10,72 +10,85 @@ Original file is located at
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
+import joblib
 
-# Load the pre-trained model
-@st.cache_data
-def load_model():
-    return LinearRegression()
+# Load the trained model
+model = joblib.load('linear_regression_model.pkl')
 
-# Process data function
-def process_data(test_file):
-    test = pd.read_csv(test_file)
+# Title of the app
+st.title("Stock Price Prediction App")
+
+# File uploader for the test set
+uploaded_file = st.file_uploader("Upload your test.csv file", type=["csv"])
+
+if uploaded_file is not None:
+    # Read the test file
+    test = pd.read_csv(uploaded_file)
+
+    # Data preprocessing
+    st.write("Preprocessing the data...")
     test['year'] = pd.to_datetime(test['Date']).dt.year
     test['day'] = pd.to_datetime(test['Date']).dt.day
+    test['lag_0'] = test['Low'].shift(+1)
+    test['lag_1'] = test['Low'].shift(+2)
+    test['lag_2'] = test['Low'].shift(+3)
+    test['lag_3'] = test['Low'].shift(+4)
 
-    test['lag_0'] = test['Low'].shift(+1).fillna(18068.349609)
-    test['lag_1'] = test['Low'].shift(+2).fillna(18068.349609)
-    test['lag_2'] = test['Low'].shift(+3).fillna(18068.349609)
-    test['lag_3'] = test['Low'].shift(+4).fillna(18068.349609)
+    # Fill missing lag values with a default (mean or median from training data)
+    default_value = 18068.349609  # Replace with your desired value
+    test['lag_0'] = test['lag_0'].fillna(default_value)
+    test['lag_1'] = test['lag_1'].fillna(default_value)
+    test['lag_2'] = test['lag_2'].fillna(default_value)
+    test['lag_3'] = test['lag_3'].fillna(default_value)
 
+    # Align features with training set
     X_test = test[['year', 'Low', 'Close', 'High', 'lag_0', 'lag_1', 'lag_2', 'lag_3']]
-    return test, X_test
 
-# Main Streamlit app
-st.title("Stock Price Prediction App")
-st.write("Upload your test CSV file to generate predictions and fetch stock data.")
+    # Predict using the model
+    try:
+        y_pred = model.predict(X_test)
+        st.success("Prediction successful!")
+    except ValueError as e:
+        st.error(f"Error during prediction: {e}")
+        st.stop()
 
-# File upload
-test_file = st.file_uploader("Upload Test CSV File", type="csv")
-
-if test_file:
-    model = load_model()
-
-    # Mock training to avoid errors
-    X_train_mock = np.random.rand(100, 7)
-    y_train_mock = np.random.rand(100)
-    model.fit(X_train_mock, y_train_mock)
-
-    test, X_test = process_data(test_file)
-    y_pred = model.predict(X_test)
-
+    # Create submission DataFrame
     submission = pd.DataFrame({
-        'id': test['id'],
+        'id': test['id'],  # Ensure `id` is in the uploaded test file
         'Open': y_pred
     })
 
-    submission.to_csv('output.csv', index=False)
-    st.success("Predictions generated! File saved as output.csv.")
+    # Save submission file
+    submission_file = "submission.csv"
+    submission.to_csv(submission_file, index=False)
 
-    with open('output.csv', 'rb') as file:
-        st.download_button(label="Download Predictions", data=file, file_name='output.csv', mime='text/csv')
+    # Provide download link for submission file
+    st.download_button(
+        label="Download Submission File",
+        data=submission.to_csv(index=False),
+        file_name=submission_file,
+        mime="text/csv"
+    )
 
-    # Stock ID input
-    stock_id = st.text_input("Enter the Stock ID to fetch details:")
+    # Ask for user input (Stock ID)
+    stock_id = st.text_input("Enter the Stock ID to get details:")
 
     if stock_id:
-        try:
-            stock_id = int(stock_id)
-            open_price = submission.loc[submission['id'] == stock_id, 'Open'].values[0]
-            st.write(f"### Open Price for Stock ID {stock_id}: {open_price}")
+        # Find the stock ID in the submission file
+        stock_data = submission[submission['id'] == int(stock_id)]
 
-            high = test.loc[test['id'] == stock_id, 'High'].values[0]
-            low = test.loc[test['id'] == stock_id, 'Low'].values[0]
-            close = test.loc[test['id'] == stock_id, 'Close'].values[0]
+        if not stock_data.empty:
+            open_price = stock_data['Open'].values[0]
+            st.write(f"Open Price for Stock ID {stock_id}: {open_price}")
 
-            st.write("### Additional Details")
-            st.write(f"**High:** {high}")
-            st.write(f"**Low:** {low}")
-            st.write(f"**Close:** {close}")
-        except IndexError:
-            st.error("Stock ID not found in the dataset.")
+            # Get High, Low, and Close values from the test set
+            high = test.loc[test['id'] == int(stock_id), 'High'].values[0]
+            low = test.loc[test['id'] == int(stock_id), 'Low'].values[0]
+            close = test.loc[test['id'] == int(stock_id), 'Close'].values[0]
+
+            st.write(f"High: {high}")
+            st.write(f"Low: {low}")
+            st.write(f"Close: {close}")
+        else:
+            st.error("Stock ID not found in the submission file.")
+
