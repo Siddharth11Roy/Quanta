@@ -82,9 +82,9 @@ if uploaded_file is not None:
             st.write(f"Open Price for Stock ID {stock_id}: {open_price}")
 
             # Get High, Low, and Close values from the test set
-            high = test.loc[test['id'] == int(stock_id), 'High'].values[0]
-            low = test.loc[test['id'] == int(stock_id), 'Low'].values[0]
-            close = test.loc[test['id'] == int(stock_id), 'Close'].values[0]
+            high = test.loc[test['id'] == (stock_id), 'High'].values[0]
+            low = test.loc[test['id'] == (stock_id), 'Low'].values[0]
+            close = test.loc[test['id'] == (stock_id), 'Close'].values[0]
 
             st.write(f"High: {high}")
             st.write(f"Low: {low}")
